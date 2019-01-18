@@ -25,7 +25,7 @@ D = diff(3.5e-10) * 1e+6
 dt = 1  # dx2/(2*D*dx2)
 nx = int(sx/dx)
 
-nts = [1, 60, 60*30, 60*60, 60*120, 60*240]
+nts = [1, 60, 60*30, 60*60]
 
 # Calc initial state
 u = np.zeros(nx)
