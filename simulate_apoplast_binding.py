@@ -123,6 +123,8 @@ for i in range(simulation_times):
             travel_distance[i] = dist
 
 
+travel_distance.sort
+
 plt.hist(end_times)
 plt.title('Distribution for time of molecules to bind to cell membrane; N={0}'.format(
     len(end_times)))
