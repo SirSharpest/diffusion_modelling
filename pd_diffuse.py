@@ -1,3 +1,4 @@
+from json import dump as jsonsave
 from matplotlib.colors import LogNorm
 from pylab import figure, cm
 import numpy as np
@@ -76,20 +77,21 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
     yield cells
 
 
-def make_cell_states(q=1, t=60*60):
+Xs = 100  # number of positions, per cell
+
+
+def make_cell_states(q=1, t=60*60, r=3.5e-10):
     N = 11  # -5 +5
-    Xs = 100  # number of positions, per cell
     cell_mm = 0.1  # big cells
     dx = Xs/cell_mm  # difference in x
     dx = 0.1
-
     dt = 1
     g = 1
-    b = 0
     cells = np.zeros((N, Xs))
+    b = 0
     cells[cells.shape[0]//2] = 1
     th = 1
-    a = stokes_einstein(3.5e-10) * 1e+6  # mm per second ^2
+    a = stokes_einstein(r) * 1e+6  # mm per second ^2
     return C(dx, t, a, dt, g, b, cells, 0, bs, th, astimeseries=True, q=q)
 
 
@@ -124,4 +126,33 @@ def do_plot():
     plot_final_state(states[-1], 11, 100)
 
 
-# do_plot()
+def make_compare_figures():
+    pass
+
+
+def make_data_for_analysis():
+    sa_data = {}
+    cal_data = {}
+    time = 60*60
+
+    for pd in [np.around(1-(0+(10*i)/100), 1) for i in range(0, 2)]:
+
+        sa_data['pd_{0}'.format(pd)] = {
+            k: v.mean(axis=1).tolist()
+            for k, v in enumerate(make_cell_states(q=pd,
+                                                   t=time))}
+
+        cal_data['pd_{0}'.format(pd)] = {
+            k: v.mean(axis=1).tolist()
+            for k, v in enumerate(make_cell_states(q=pd,
+                                                   t=time,
+                                                   r=1.94e-10))}
+
+    data = {'sa': sa_data, 'cal': cal_data}
+
+    return data
+
+
+dat = make_data_for_analysis()
+jsonsave(dat, codecs.open('data2.json', 'w', encoding='utf-8'),
+         separators=(',', ':'), sort_keys=True, indent=4)
