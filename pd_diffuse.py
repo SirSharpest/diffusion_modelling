@@ -1,3 +1,4 @@
+from animate_pd_diffuse import make_double_animation
 from json import dump as jsonsave
 from matplotlib.colors import LogNorm
 from pylab import figure, cm
@@ -62,15 +63,17 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
             u[1:-1] = diffuse_vectorise(un, g, bb, dt, dx2, a)
 
             if idx < cells.shape[0]-1:
-                u[-1] = diffuse_point(cells[idx+1][0],
-                                      u[-1],
-                                      u[-2], a, g, bb, dt, dx2, q=q)
-
+                tmp_edge1 = diffuse_point(cells[idx+1][0],
+                                          u[-1],
+                                          u[-2], a, g, bb, dt, dx2, q=q)
             if idx > 0:
                 u[0] = diffuse_point(u[1],
                                      u[0],
                                      cells[idx-1][-1], a, g, bb, dt, dx2, q=q)
 
+            # Delay updated other edge until all is computed
+            if idx < cells.shape[0]-1:
+                u[-1] = tmp_edge1
             cells[idx] = u
         if astimeseries:
             yield cells.copy()
@@ -78,11 +81,11 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
 
 
 Xs = 100  # number of positions, per cell
+N = 11  # -5 +5
+cell_mm = 0.1  # big cells
 
 
 def make_cell_states(q=1, t=60*60, r=3.5e-10):
-    N = 11  # -5 +5
-    cell_mm = 0.1  # big cells
     dx = Xs/cell_mm  # difference in x
     dx = 0.1
     dt = 1
@@ -97,26 +100,25 @@ def make_cell_states(q=1, t=60*60, r=3.5e-10):
 
 def plot_final_state(cells, N, Xs):
     sns.set()
-    fig, axes = plt.subplots(2, sharex=True)
-    x_labels_locations = np.linspace(0, N*Xs, num=11)
-    x_labels_locations = [50+(i*100) for i in range(11)]
+    fig, axes = plt.subplots(2)
+    x_labels_locations = np.linspace(0, N, num=11)
 
     x_labels = ['C{0}'.format(n) for n in range(11)]
 
-    axes[0].plot(cells.ravel())
-    axes[0].set_ylim(1e-100, 10)
+    axes[0].plot(cells)
+    axes[0].set_ylim(1e-12, 10)
     axes[0].set_yscale('log')
+    axes[0].set_xlim(0, 10)
 
-    pcm = axes[1].pcolormesh(np.expand_dims(cells.ravel(),
+    pcm = axes[1].pcolormesh(np.expand_dims(cells,
                                             axis=0),
-                             norm=LogNorm(vmin=1e-100,
-                                          vmax=1e-2))
+                             norm=LogNorm(vmin=1e-12,
+                                          vmax=1))
 
     plt.sca(axes[1])
     plt.xticks(x_labels_locations, x_labels)
     plt.colorbar(pcm, orientation="horizontal", pad=0.2)
     plt.tight_layout()
-    # plt.savefig('pd_100_open.png')
     plt.show()
 
 
@@ -130,20 +132,20 @@ def make_compare_figures():
     pass
 
 
-def make_data_for_analysis():
+def make_data_for_analysis(t=60*60):
     sa_data = {}
     cal_data = {}
-    time = 60*60
-
+    time = t
+    num_res = 12
     for pd in [np.around(1-(0+(10*i)/100), 1) for i in range(0, 2)]:
 
         sa_data['pd_{0}'.format(pd)] = {
-            k: v.mean(axis=1).tolist()
+            k: np.around(np.median(v, axis=1), num_res).tolist()
             for k, v in enumerate(make_cell_states(q=pd,
                                                    t=time))}
 
         cal_data['pd_{0}'.format(pd)] = {
-            k: v.mean(axis=1).tolist()
+            k: np.around(np.median(v, axis=1), num_res).tolist()
             for k, v in enumerate(make_cell_states(q=pd,
                                                    t=time,
                                                    r=1.94e-10))}
@@ -153,6 +155,10 @@ def make_data_for_analysis():
     return data
 
 
-dat = make_data_for_analysis()
-jsonsave(dat, codecs.open('data2.json', 'w', encoding='utf-8'),
-         separators=(',', ':'), sort_keys=True, indent=4)
+if __name__ == '__main__':
+    ts = 60*60
+    dat = make_data_for_analysis(t=ts)
+    make_double_animation(dat, 'sa', 'pd_1.0', N, ts)
+   # plot_final_state(dat['sa']['pd_1.0'][60], N, Xs)
+   # jsonsave(dat, open('data.json', 'w', encoding='utf-8'),
+   #          separators=(',', ':'), sort_keys=True, indent=4)
