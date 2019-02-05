@@ -86,15 +86,33 @@ def handle_bottom_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
         c3 = cells[idy, idx, -1, x-1]
         x_matrix[x] = diffuse_1d_point(c2, c1, c3, a, g, b, dt, dx2, q=q)
 
-    return (cells[idy, idx, -1] + a * (((cells[idy+1, idx, 0] - 2 * cells[idy, idx, -1] + cells[idy, idx, -2]) / dy2) +
-                                 ((x_matrix) / dx2))) * g + b
+    return Q(cells[idy, idx, -1] + a * (((cells[idy+1, idx, 0] - 2 * cells[idy, idx, -1] + cells[idy, idx, -2]) / dy2) +
+                                 (x_matrix)), q=q) * g + b
 
-def handle_left_wall(cells, idx, g, bb, dt, dx2, dy2, a):
-    return 0
+def handle_left_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
+    y_matrix = np.zeros(cells.shape[-2])
+
+    for x in range(1, cells.shape[-2] - 1):
+        c1 = cells[idy, idx, x, 0]
+        c2 = cells[idy, idx, x+1, 0]
+        c3 = cells[idy, idx, x-1, 0]
+        y_matrix[x] = diffuse_1d_point(c2, c1, c3, a, g, b, dt, dy2, q=1)
+
+    return Q(cells[idy, idx, :, 0] + a * (((cells[idy, idx-1, :, -1] - 2 * cells[idy, idx, :,0] + cells[idy, idx,:, 1]) / dx2) +
+                                 (y_matrix)), q=q) * g + b
 
 
-def handle_right_wall(cells, idx, g, bb, dt, dx2, dy2, a):
-    return 0
+def handle_right_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
+    y_matrix = np.zeros(cells.shape[-2])
+
+    for x in range(1, cells.shape[-2] - 1):
+        c1 = cells[idy, idx, x, -1]
+        c2 = cells[idy, idx, x+1, -1]
+        c3 = cells[idy, idx, x-1, -1]
+        y_matrix[x] = diffuse_1d_point(c2, c1, c3, a, g, b, dt, dy2, q=1)
+
+    return Q(cells[idy, idx, :, -1] + a * (((cells[idy, idx+1, :, 0] - 2 * cells[idy, idx, :,-1] + cells[idy, idx,:, -2]) / dx2) +
+                                 (y_matrix)), q=q) * g + b       
 
 
 def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
@@ -122,16 +140,16 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                 u[1:-1, 1:-1] = diffuse_vectorise(un, g, bb, dt, dx2, dy2, a)
 
                 # # TODO: MAJOR REWORK
-                # if idx > 0:
-                #     tl = handle_left_wall(cells,
-                #                           idx, g,
-                #                           bb, dt,
-                #                           dx2, dy2, a)
-                # if idx < cells.shape[0]-1:
-                #     tr = handle_right_wall(cells,
-                #                            idx, g,
-                #                            bb, dt,
-                #                            dx2, dy2, a)
+                if idx > 0:
+                    tl = handle_left_wall(cells,
+                                          idx, idy, g,
+                                          bb, dt,
+                                          dx2, dy2, a)
+                if idx < cells.shape[0]-1:
+                    tr = handle_right_wall(cells,
+                                           idx, idy, g,
+                                           bb, dt,
+                                           dx2, dy2, a)
                 
                 if idy >0:
                     tt = handle_top_wall(cells,
@@ -145,10 +163,10 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                                              dx2, dy2, a)
 
                 # # TODO: HANDLE CORNER PROBLEM
-                # if tl:
-                #     u[0, :] = tl
-                # if tr:
-                #     u[-1, :] = tr
+                if tl is not None:
+                     u[:, 0] = tl
+                if tr is not None:
+                     u[:, -1] = tr
                 if tt is not None:
                      u[0, :] = tt
                 if tb is not None:
@@ -181,30 +199,6 @@ def make_cell_states(q=1, t=60*60, r=3.5e-10):
     a = stokes_einstein(r) * 1e+6  # mm per second ^2
     return C(dx, dy, t, a, dt, g, b, cells, 0, bs, th, astimeseries=True, q=q)
 
-
-def plot_final_state(cells, N, Xs):
-    # TODO: Upgrade to 2D
-    sns.set()
-    fig, axes = plt.subplots(2)
-    x_labels_locations = np.linspace(0, N, num=11)
-
-    x_labels = ['C{0}'.format(n) for n in range(11)]
-
-    axes[0].plot(cells)
-    axes[0].set_ylim(1e-12, 10)
-    axes[0].set_yscale('log')
-    axes[0].set_xlim(0, 10)
-
-    pcm = axes[1].pcolormesh(np.expand_dims(cells,
-                                            axis=0),
-                             norm=LogNorm(vmin=1e-12,
-                                          vmax=1))
-
-    plt.sca(axes[1])
-    plt.xticks(x_labels_locations, x_labels)
-    plt.colorbar(pcm, orientation="horizontal", pad=0.2)
-    plt.tight_layout()
-    plt.show()
 
 
 def make_data_for_analysis(t=60*60, average=False):
@@ -245,14 +239,21 @@ def make_data_for_analysis(t=60*60, average=False):
 
 
 def plot_data(data, chem, pd, tp):
-    fig, axes = plt.subplots(data[chem][pd][tp].shape[0], data[chem][pd][tp].shape[1])
-    for y in range(len(data[chem][pd][tp])):
-        for x in range(len(data[chem][pd][tp])):
-            axes[y,x].pcolormesh(data[chem][pd][tp][y,x], norm=LogNorm(vmin=1e-4, vmax=1), cmap='plasma')
-            axes[y,x].set_xticks([])   
-            axes[y,x].set_yticks([])   
-            axes[y,x].invert_yaxis()
-        fig.suptitle('Seconds: {0}'.format(tp))
+    plt.close('all')
+    import matplotlib.gridspec as gridspec
+    fig = plt.figure()
+    gs1 = gridspec.GridSpec(data[chem][pd][tp].shape[0], data[chem][pd][tp].shape[1])
+    gs1.update(wspace=0, hspace=0)
+
+    m_i = len(data[chem][pd][tp])
+    for i in range(m_i**2):
+        axes = plt.subplot(gs1[i])
+        axes.pcolormesh(data[chem][pd][tp][i//m_i, i%m_i], norm=LogNorm(vmin=1e-4, vmax=1), cmap='plasma')
+        axes.set_xticks([])   
+        axes.set_yticks([])   
+        axes.invert_yaxis()
+    fig.suptitle('Seconds: {0}'.format(tp))
+        
 
 
 if __name__ == '__main__':
@@ -260,8 +261,7 @@ if __name__ == '__main__':
     ts = 60*10
     dat = make_data_for_analysis(t=ts, average=average)
     
-    for i in np.linspace(1, ts, num=4, dtype=int):
-        plot_data(dat, 'sa', 'pd_1.0', i)        
+    plot_data(dat, 'sa', 'pd_1.0', ts)        
     # TEsting funcs
     get_middle = lambda x,y,z: dat['sa']['pd_1.0'][x][y,z]
     
