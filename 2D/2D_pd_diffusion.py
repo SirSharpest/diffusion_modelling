@@ -38,10 +38,13 @@ def diffuse_1d_point(c1, c2, c3, a, g, b, dt, dx2, q=1):
     Takes 3 concentration points and diffuses between them
     uses a diffusiveness of PD to estimate passage through
     """
-    def Q(A, q=q):
-        return A * q
+
 
     return Q((c2 + a * dt/dx2 * (c1 - 2 * c2 + c3)) * g + b)
+
+def Q(A, q=1):
+    return A * q
+
 
 
 def bs(c, th):
@@ -68,15 +71,23 @@ def handle_top_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
         c1 = cells[idy, idx, 0, x]
         c2 = cells[idy, idx, 0, x+1]
         c3 = cells[idy, idx, 0, x-1]
+        x_matrix[x] = diffuse_1d_point(c2, c1, c3, a, g, b, dt, dx2, q=1)
+
+    return Q(cells[idy, idx, 0] + a * (((cells[idy-1, idx, -1] - 2 * cells[idy, idx, 0] + cells[idy, idx, 1]) / dy2) +
+                                 (x_matrix)), q=q) * g + b
+
+
+def handle_bottom_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
+    x_matrix = np.zeros(cells.shape[-1])
+
+    for x in range(1, cells.shape[-1] - 1):
+        c1 = cells[idy, idx, -1, x]
+        c2 = cells[idy, idx, -1, x+1]
+        c3 = cells[idy, idx, -1, x-1]
         x_matrix[x] = diffuse_1d_point(c2, c1, c3, a, g, b, dt, dx2, q=q)
 
-    return (cells[idy, idx, 0] + a * (((cells[idy-1, idx, -1] - 2 * cells[idy, idx, 0] + cells[idy, idx, 1]) / dy2) +
+    return (cells[idy, idx, -1] + a * (((cells[idy+1, idx, 0] - 2 * cells[idy, idx, -1] + cells[idy, idx, -2]) / dy2) +
                                  ((x_matrix) / dx2))) * g + b
-
-
-def handle_bottom_wall(cells, idx, g, bb, dt, dx2, dy2, a):
-    return 0
-
 
 def handle_left_wall(cells, idx, g, bb, dt, dx2, dy2, a):
     return 0
@@ -89,7 +100,7 @@ def handle_right_wall(cells, idx, g, bb, dt, dx2, dy2, a):
 def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
     # TODO: Upgrade to 2D
     """
-    takes a delta x, number of timepoints to compute, alpha diffusiveness of
+    takes a delta x, number of timepoints to compute, alpha diffusivenes of
     molecule delta time, gamma decay, beta production, current concentration
     matrix, number of iterations completed already and a function to derive
     cells which will produce the beta term
@@ -127,10 +138,11 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                                          idx, idy, 
                                          g, bb, dt,
                                          dx2, dy2, a)
-                #     tb = handle_bottom_wall(cells,
-                #                             idx, g,
-                #                             bb, dt,
-                #                             dx2, dy2, a)
+                if idy < cells.shape[0]-1:
+                    tb = handle_bottom_wall(cells,
+                                             idx, idy, g,
+                                             bb, dt,
+                                             dx2, dy2, a)
 
                 # # TODO: HANDLE CORNER PROBLEM
                 # if tl:
@@ -139,8 +151,8 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                 #     u[-1, :] = tr
                 if tt is not None:
                      u[0, :] = tt
-                # if tb:
-                #     u[:, -1] = tb
+                if tb is not None:
+                     u[-1, :] = tb
                 cells[idy,idx] = u
         if astimeseries:
             yield cells.copy()
@@ -200,7 +212,7 @@ def make_data_for_analysis(t=60*60, average=False):
     sa_data = {}
     cal_data = {}
     time = t
-    num_res = 12
+    num_res = 13
     for pd in [np.around(1-(0+(10*i)/100), 1) for i in range(0, 1)]:
 
         if average:
@@ -236,19 +248,20 @@ def plot_data(data, chem, pd, tp):
     fig, axes = plt.subplots(data[chem][pd][tp].shape[0], data[chem][pd][tp].shape[1])
     for y in range(len(data[chem][pd][tp])):
         for x in range(len(data[chem][pd][tp])):
-            print(y,x)
-            axes[y,x].imshow(data[chem][pd][tp][y,x], norm=LogNorm(vmin=1e-12, vmax=1), cmap='plasma')
+            axes[y,x].pcolormesh(data[chem][pd][tp][y,x], norm=LogNorm(vmin=1e-4, vmax=1), cmap='plasma')
             axes[y,x].set_xticks([])   
             axes[y,x].set_yticks([])   
-        fig.tight_layout()
-
+            axes[y,x].invert_yaxis()
+        fig.suptitle('Seconds: {0}'.format(tp))
 
 
 if __name__ == '__main__':
     average = False
-    ts = 60
+    ts = 60*10
     dat = make_data_for_analysis(t=ts, average=average)
-    plot_data(dat, 'sa', 'pd_1.0', 60)
+    
+    for i in np.linspace(1, ts, num=4, dtype=int):
+        plot_data(dat, 'sa', 'pd_1.0', i)        
     # TEsting funcs
     get_middle = lambda x,y,z: dat['sa']['pd_1.0'][x][y,z]
     
