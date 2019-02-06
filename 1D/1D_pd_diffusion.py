@@ -1,4 +1,4 @@
-from animate_pd_diffuse import make_double_animation
+#from animate_pd_diffuse import make_double_animation
 from json import dump as jsonsave
 from matplotlib.colors import LogNorm
 from pylab import figure, cm
@@ -178,7 +178,7 @@ def animation(dat):
 
 if __name__ == '__main__':
     average = False
-    ts = 60*60*24
+    ts = 60*20
     dat = make_data_for_analysis(t=ts, average=average)
     print('Computed data')
     for i in dat.keys():
