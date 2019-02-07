@@ -20,22 +20,6 @@ def diffuse_vectorise(un, g, b, dt, dx2, dy2, a):
         g + b
 
 
-def diffuse_2d_point(c1, c2, c3, c4, c5, dx2, dy2, dt, a, q=1):
-    """
-    Where:
-    C1 is Cell_i,j
-
-    C2 is Cell_-1,j
-    C3 is Cell_+1,j
-
-    C4 is Cell_i,+1
-    C5 is Cell_i,-1
-    """
-    def Q(A, q=q):
-        return A * q
-    Q(c1 + (a * ((c2 - 2 * c1 + c3) * dt / dx2) + ((c4 - 2 * c1 + c5) * dt / dx2)))
-
-
 def diffuse_1d_point(c1, c2, c3, a, g, b, dt, dx2, q=1):
     """
     Takes 3 concentration points and diffuses between them
@@ -119,6 +103,7 @@ def handle_right_wall(cells, idx, idy, g, b, dt, dx2, dy2, a, q=1):
 
 
 def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
+    # TODO: Upgrade to 2D
     """
     takes a delta x, number of timepoints to compute, alpha diffusivenes of
     molecule delta time, gamma decay, beta production, current concentration
@@ -141,6 +126,7 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                 un = u.copy()  # TODO: Possibly don't need so many copies
                 u[1:-1, 1:-1] = diffuse_vectorise(un, g, bb, dt, dx2, dy2, a)
 
+                # # TODO: MAJOR REWORK
                 if idx > 0:
                     tl = handle_left_wall(cells,
                                           idx, idy, g,
@@ -162,7 +148,6 @@ def C(dx, dy, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                                             idx, idy, g,
                                             bb, dt,
                                             dx2, dy2, a)
-
                 if tl is not None:
                     u[:, 0] = tl
                 if tr is not None:
@@ -187,78 +172,46 @@ cell_mm = 0.05  # big cells
 def make_cell_states(q=1, t=60*60, r=3.5e-10):
     dx = 0.1
     dy = 0.1
-    dt = 1
+    dt = 30
     g = 1
     cells = np.zeros((Nx, Ny, Xs, Ys))
     b = 0
-    cells[1, 1] = 1
+    cells[4, 4] = 1
 
     th = 1
     a = stokes_einstein(r) * 1e+6  # mm per second ^2
     return C(dx, dy, t, a, dt, g, b, cells, 0, bs, th, astimeseries=True, q=q)
 
 
-def make_data_for_analysis(t=60*60, average=False):
-    sa_data = {}
-    cal_data = {}
+def make_data_for_analysis(t=60*60, chem_space=3.5e-10, average=False):
+    chemical_data = {}
     time = t
     num_res = 13
-    for pd in [np.around(((10*i)/1000), 2) for i in range(0, 11)]:
-
-        if average:
-            sa_data['pd_{0}'.format(pd)] = {
-                k: np.around(np.median(v, axis=1), num_res).tolist()
-                for k, v in enumerate(make_cell_states(q=pd,
-                                                       t=time))}
-            cal_data['pd_{0}'.format(pd)] = {
-                k: np.around(np.median(v, axis=1), num_res).tolist()
-                for k, v in enumerate(make_cell_states(q=pd,
-                                                       t=time,
-                                                       r=1.94e-10))}
-        else:
-            sa_data['pd_{0}'.format(pd)] = {
-                k: np.around(v, num_res)
-                for k, v in enumerate(make_cell_states(q=pd,
-                                                       t=time))}
-
-            cal_data['pd_{0}'.format(pd)] = {
-                k: np.around(v, num_res)
-                for k, v in enumerate(make_cell_states(q=pd,
-                                                       t=time,
-                                                       r=1.94e-10))}
-
-    data = {'sa': sa_data, 'cal': cal_data}
-
-    return data
-
-
-def plot_data(data, chem, pd, tp):
-    plt.close('all')
-    import matplotlib.gridspec as gridspec
-    fig = plt.figure()
-    gs1 = gridspec.GridSpec(
-        data[chem][pd][tp].shape[0], data[chem][pd][tp].shape[1])
-    gs1.update(wspace=0, hspace=0)
-
-    m_i = len(data[chem][pd][tp])
-    for i in range(m_i**2):
-        axes = plt.subplot(gs1[i])
-        axes.pcolormesh(data[chem][pd][tp][i//m_i, i %
-                                           m_i], norm=LogNorm(vmin=1e-13, vmax=1))
-        axes.set_xticks([])
-        axes.set_yticks([])
-        axes.invert_yaxis()
-        axes.set_facecolor((0, 0, 0))
-    fig.suptitle('Seconds: {0}'.format(tp))
+    for c in chem_space:
+        tmp_data = {}
+        for pd in np.around(np.linspace(0, 0.2, num=20), 3):
+            tmp_data['pd_{0}'.format(pd)] = {}
+            for k, v in enumerate(make_cell_states(q=pd, t=time, r=c)):
+                s1, s2, s3, s4 = v.shape
+                tmp_data['pd_{0}'.format(pd)][k] = np.around(
+                    np.mean(v.reshape(s1, s2, s3*s4), axis=2), num_res)
+        chemical_data[c] = tmp_data
+    return chemical_data
 
 
 if __name__ == '__main__':
     average = False
-    ts = 60*60*12
-    dat = make_data_for_analysis(t=ts, average=average)
-    for i in dat.keys():
-        for p in dat[i].keys():
-            for a in dat[i][p].keys():
-                dat[i][p][a] = dat[i][p][a].tolist()
-            jsonsave(dat[i][p], open('./json/data_{0}_{1}.json'.format(i, p), 'w', encoding='utf-8'),
-                     separators=(',', ':'), sort_keys=True, indent=4)
+    ts = 2*60*4
+    m_dat = {}
+    for ch in np.linspace(1e-10, 4e-10, num=20):
+        dat = make_data_for_analysis(t=ts, chem_space=[ch], average=average)
+        for i in dat.keys():
+            for p in dat[i].keys():
+                for a in dat[i][p].keys():
+                    dat[i][p][a] = dat[i][p][a].tolist()
+                    m_dat['{0}_{1}_{2}_{3}'.format(ch, i, p, a)] = dat[i][p][a]
+                # jsonsave(dat[i][p], open('./json/data_{0}_{1}.json'.format(i, p), 'w', encoding='utf-8'),
+                #          separators=(',', ':'), sort_keys=True, indent=4)
+
+    jsonsave(m_dat, open('master_data_4hrs.json', 'w', encoding='utf-8'),
+             separators=(',', ':'), sort_keys=True, indent=4)
