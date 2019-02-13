@@ -1,7 +1,4 @@
-#from animate_pd_diffuse import make_double_animation
-from json import dump as jsonsave
 from matplotlib.colors import LogNorm
-from pylab import figure, cm
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -80,21 +77,20 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
     yield cells
 
 
-Xs = 100  # number of positions, per cell
-N = 20  # -5 +5
-cell_mm = 0.05  # big cells
+Xs = 10  # number of positions, per cell
+N = 5  # -5 +5
+cell_mm = 1  # big cells
 
 
 def make_cell_states(q=1, t=60*60, r=3.5e-10):
-    dx = Xs/cell_mm  # difference in x
-    dx = 0.1
+    dx = cell_mm/Xs
     dt = 1
     g = 1
     cells = np.zeros((N, Xs))
     b = 0
     cells[cells.shape[0]//2] = 1
     th = 1
-    a = stokes_einstein(r) * 1e+6  # mm per second ^2
+    a = stokes_einstein(r) * 1e+5  # mm per second ^2
     return C(dx, t, a, dt, g, b, cells, 0, bs, th, astimeseries=True, q=q)
 
 
@@ -168,24 +164,14 @@ def make_data_for_analysis(t=60*60, average=False):
     return data
 
 
-def animation(dat):
-    for chem in dat.keys():
-        for p_perm in dat[chem].keys():
-            make_double_animation(dat, chem, p_perm, N,
-                                  Xs, ts, average=average)
-    print('Made image data')
-
-
 if __name__ == '__main__':
     average = False
-    ts = 60*20
-    dat = make_data_for_analysis(t=ts, average=average)
-    print('Computed data')
-    for i in dat.keys():
-        for p in dat[i].keys():
-            for a in dat[i][p].keys():
-                dat[i][p][a] = dat[i][p][a].tolist()
-    print('Coverted data')
-    jsonsave(dat, open('data.json', 'w', encoding='utf-8'),
-             separators=(',', ':'), sort_keys=True, indent=4)
-    print('Saved data')
+    ts = 60*60*14
+    for s in [0.9]:
+        fig, ax = plt.subplots()
+        data = [i for i in make_cell_states(q=1, t=ts)]
+        d14 = data[-1]
+        d0 = data[0]
+        print('Computed data')
+        ax.plot(d0.ravel())
+        ax.plot(d14.ravel())
