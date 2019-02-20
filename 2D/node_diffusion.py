@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import time
 import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-
+from copy import deepcopy
 """
 Created on Wed Feb 13 14:44:46 2019
 
@@ -126,14 +127,14 @@ class Node:
 
 
 if __name__ == '__main__':
-
+    t1 = time.time()
     # Number of time points, in seconds
-    nt = 10
+    nt = 60*60*4
     # delta t is just one
     dt = 1
 
     # Number of cells per direction
-    Xs, Ys = 5, 5
+    Xs, Ys = 25, 25
 
     # Using moss cell measurements
     cell_um = 100
@@ -148,7 +149,7 @@ if __name__ == '__main__':
 
     # Set IC and add pulse in centre
     ic = np.zeros((Ys, Xs))
-    ic[Ys//2, Xs//2] = 1
+    ic[1] = 1
 
     # Make nodes from IC
     nodes = array_to_nodes(ic)
@@ -160,11 +161,13 @@ if __name__ == '__main__':
     prod_lower_lim = 0.1
 
     # Get results from cells
-    Cells = [diffuse(nodes, dx2, dy2, D, i, pd_rate, beta).copy()
+    Cells = [deepcopy(diffuse(nodes, dx2, dy2, D, i, pd_rate, beta))
              for i in range(1, nt)]
 
-    sns.scatterplot(data=to_dataframe(nodes_to_array(Cells[-1])),
-                    x='X', y='Y', size='C', hue='C',
-                    legend=False, sizes=(300, 300), style='M', markers=['s', 'X'])
+    print('{0} took {1:.2f} seconds  to simulate'.format(nt, time.time()-t1))
 
-    plt.show()
+    # sns.scatterplot(data=to_dataframe(nodes_to_array(Cells[1])),
+    #                 x='X', y='Y', size='C', hue='C',
+    #                 legend=False, sizes=(300, 300), style='M', markers=['s', 'X'])
+
+    # plt.show()
