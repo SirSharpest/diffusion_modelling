@@ -1,15 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from helper_funcs import diff
 
 
 def C(x, t, D): return (1/np.sqrt(4*np.pi*D*t)
-                        * np.exp(- ((np.square(x))/(4*D*t))))
+                        * np.exp(((-np.square(x))/(4*D*t))))
 
 
-D = diff(3.5e-10) * 1e+6
-X = np.linspace(-5, 5, 10)
-t = 10
+def stokes_einstein(x): return ((1.38e-23 * 298.15)/(6*np.pi * 8.9e-4 * x))
+
+
+D = stokes_einstein(3.5e-10)
+X = np.linspace(-0.0001, 0.0001, 100)
+t = 1
 
 c = [C(x, t, D) for x in X]
 

@@ -10,7 +10,7 @@ def diffuse_vectorise(un, g, b, dt, dx2, a):
     flux of molecule. Uses these data to compute next time state
 
     """
-    return (un[1:-1] + a * dt/dx2 * (un[0:-2] - 2 * un[1:-1] + un[2:])) * g + b
+    return (un[1:-1] + a  * (un[0:-2] - 2 * un[1:-1] + un[2:])/dx2) * g + b
 
 
 def diffuse_point(c1, c2, c3, a, g, b, dt, dx2, q=1):
@@ -19,9 +19,9 @@ def diffuse_point(c1, c2, c3, a, g, b, dt, dx2, q=1):
     uses a diffusiveness of PD to estimate passage through
     """
     def Q(A, q=q):
-        return A * q
+        return A *q
 
-    return Q((c2 + a * dt/dx2 * (c1 - 2*c2 + c3)) * g + b)
+    return (c2 + a * (Q(c1) - 2*c2 + c3)/dx2) * g + b
 
 
 def bs(c, th):
@@ -64,9 +64,10 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
                                           u[-1],
                                           u[-2], a, g, bb, dt, dx2, q=q)
             if idx > 0:
-                u[0] = diffuse_point(u[1],
-                                     u[0],
-                                     cells[idx-1][-1], a, g, bb, dt, dx2, q=q)
+                u[0] = diffuse_point(cells[idx-1][-1],
+                                     u[0],       
+                                     u[1],
+                                     a, g, bb, dt, dx2, q=q)
 
             # Delay updated other edge until all is computed
             if idx < cells.shape[0]-1:
@@ -77,55 +78,22 @@ def C(dx, nt, a, dt, g, b, c, num_iter, bs, th, astimeseries=False, q=1):
     yield cells
 
 
+
 Xs = 10  # number of positions, per cell
 N = 5  # -5 +5
-cell_mm = 1  # big cells
+cell_size_in_m = 0.00001
 
 
 def make_cell_states(q=1, t=60*60, r=3.5e-10):
-    dx = cell_mm/Xs
+    dx = cell_size_in_m/Xs
     dt = 1
     g = 1
     cells = np.zeros((N, Xs))
     b = 0
     cells[cells.shape[0]//2] = 1
     th = 1
-    a = stokes_einstein(r) * 1e+5  # mm per second ^2
+    a = (stokes_einstein(r) )   # mm per second ^2    
     return C(dx, t, a, dt, g, b, cells, 0, bs, th, astimeseries=True, q=q)
-
-
-def plot_final_state(cells, N, Xs):
-    sns.set()
-    fig, axes = plt.subplots(2)
-    x_labels_locations = np.linspace(0, N, num=11)
-
-    x_labels = ['C{0}'.format(n) for n in range(11)]
-
-    axes[0].plot(cells)
-    axes[0].set_ylim(1e-12, 10)
-    axes[0].set_yscale('log')
-    axes[0].set_xlim(0, 10)
-
-    pcm = axes[1].pcolormesh(np.expand_dims(cells,
-                                            axis=0),
-                             norm=LogNorm(vmin=1e-12,
-                                          vmax=1))
-
-    plt.sca(axes[1])
-    plt.xticks(x_labels_locations, x_labels)
-    plt.colorbar(pcm, orientation="horizontal", pad=0.2)
-    plt.tight_layout()
-    plt.show()
-
-
-def do_plot():
-    states = make_cell_states()
-    states = np.array([s for s in states])
-    plot_final_state(states[-1], 11, 100)
-
-
-def make_compare_figures():
-    pass
 
 
 def make_data_for_analysis(t=60*60, average=False):
@@ -163,15 +131,22 @@ def make_data_for_analysis(t=60*60, average=False):
 
     return data
 
+def analytical(x, t, D): return (1/np.sqrt(4*np.pi*D*t)
+                        * np.exp(- ((np.square(x))/(4*D*t))))
 
 if __name__ == '__main__':
     average = False
-    ts = 60*60*14
-    for s in [0.9]:
-        fig, ax = plt.subplots()
-        data = [i for i in make_cell_states(q=1, t=ts)]
-        d14 = data[-1]
-        d0 = data[0]
-        print('Computed data')
-        ax.plot(d0.ravel())
-        ax.plot(d14.ravel())
+    ts = 60
+    a = (stokes_einstein(3.5e-10)) 
+    
+    d = [i for i in make_cell_states(q=1, t=ts)][-1][N//2]
+    #print(d[5])
+#    for s in [0.9]:
+#        fig, ax = plt.subplots()
+#        data = [i for i in make_cell_states(q=1, t=ts)]
+#        d14 = data[-1].ravel()
+#        d0 = data[0]
+#        print('Computed data')
+#        #ax.plot(d0.ravel())
+#        ax.plot(d14)
+#        ax.set_ylim(0,1)

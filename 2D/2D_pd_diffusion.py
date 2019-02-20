@@ -15,8 +15,8 @@ def diffuse_vectorise(un, g, b, dt, dx2, dy2, a):
 
     """
     return (un[1:-1, 1:-1] + a *
-            (((un[2:, 1:-1] - 2 * un[1:-1, 1:-1] + un[:-2, 1:-1]) * dt / dx2) +
-             ((un[1:-1, 2:] - 2 * un[1:-1, 1:-1] + un[1:-1, :-2]) * dt / dy2))) *\
+            (((un[2:, 1:-1] - 2 * un[1:-1, 1:-1] + un[:-2, 1:-1]))/dx2 +
+             ((un[1:-1, 2:] - 2 * un[1:-1, 1:-1] + un[1:-1, :-2]) / dy2))) *\
         g + b
 
 
@@ -170,13 +170,13 @@ cell_mm = 0.05  # big cells
 
 
 def make_cell_states(q=1, t=60*60, r=3.5e-10):
-    dx = 0.1
-    dy = 0.1
+    dx = 1
+    dy = 1
     dt = 30
     g = 1
     cells = np.zeros((Nx, Ny, Xs, Ys))
     b = 0
-    cells[4, 4] = 1
+    cells[Nx//2, Ny//2] = 1
 
     th = 1
     a = stokes_einstein(r) * 1e+6  # mm per second ^2
@@ -201,7 +201,7 @@ def make_data_for_analysis(t=60*60, chem_space=3.5e-10, average=False):
 
 if __name__ == '__main__':
     average = False
-    ts = 2*60*4
+    ts = 2
     m_dat = {}
     for ch in np.linspace(1e-10, 4e-10, num=20):
         dat = make_data_for_analysis(t=ts, chem_space=[ch], average=average)
@@ -213,5 +213,5 @@ if __name__ == '__main__':
                 # jsonsave(dat[i][p], open('./json/data_{0}_{1}.json'.format(i, p), 'w', encoding='utf-8'),
                 #          separators=(',', ':'), sort_keys=True, indent=4)
 
-    jsonsave(m_dat, open('master_data_4hrs.json', 'w', encoding='utf-8'),
+    jsonsave(m_dat, open('master_data_2secs.json', 'w', encoding='utf-8'),
              separators=(',', ':'), sort_keys=True, indent=4)
