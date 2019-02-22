@@ -3,7 +3,6 @@ from matplotlib.colors import LogNorm
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from matplotlib.colors import LogNorm
 
 sns.set()
 
