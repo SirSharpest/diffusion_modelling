@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import matplotlib
-matplotlib.use("Qt5Agg")
+
 
 
 sns.set()
@@ -26,11 +25,11 @@ def diffuse_2D(nx, dx, dy, nt, D, dt, prevState=None, prevIter=None):
     return u
 
 
-nx = 1000  # Number of x measurements
+nx = 10  # Number of x measurements
 dx, dy = 1, 1   # Change in X & Y
 nt = 6  # Number of timesteps to make in calculation
 dt = 1  # change in time
-max_t = 10000
+max_t = 60
 D = 0.01  # Diffusion constant in terms of m^2/s
 nts = np.around([nt for nt in np.linspace(1, max_t, nt)])
 dts = {nt: diffuse_2D(nx, dx, dy, int(nt), D, dt) for nt in nts}
@@ -41,6 +40,7 @@ for idx, d in enumerate(nts):
     axes[idx//3, idx % 3].imshow(dts[d], cmap='gray', vmin=0, vmax=1)
     axes[idx//3, idx % 3].set_axis_off()
     axes[idx//3, idx % 3].set_title('TS: {0}'.format(d))
+    print(dts[d].sum())
 
 plt.tight_layout()
 plt.show(block=False)

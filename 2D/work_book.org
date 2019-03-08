@@ -1,0 +1,169 @@
+* Moss imitation
+
+
+#+BEGIN_SRC ipython :exports both :session :results raw drawer
+  from node_diffusion import *
+  import matplotlib.pyplot as plt
+  %matplotlib inline
+
+  sns.set()
+  t1 = time.time()
+  # Number of time points, in seconds
+  nt = 60*20
+  # delta t is just one
+  dt = 1
+  # Number of cells per direction
+  Xs, Ys = 2001, 1 # has to be odd because reasons
+  # Using moss cell measurements
+  cell_um = 100
+  dx2 = cell_um**2
+  # Chem radius in meters
+  q = 1e-10 # This param of q needs some work
+  r = 3.5e-10
+  # Speed in micrometers
+  D = D_eff(stokes_einstein(r) * 1e+12, q, cell_um)
+
+  # Set IC and add pulse in centre
+  ic = np.zeros((Ys, Xs))
+  ic[Ys//2, Xs//2] = 1
+  # Make nodes from IC
+  nodes = array_to_nodes(ic)
+  # some cell and PD constants
+  pd_rate = 1
+  beta = .001
+  prod_upper_lim = 0.6
+  prod_lower_lim = 0.1
+  # Get results from cells
+  Cells = [deepcopy(nodes)] + [deepcopy(do_node_diffusion(nodes, dx2, D, i, pd_rate, beta))
+                               for i in range(1, nt)]
+  vals = [nodes_to_array(i).sum() for i in Cells]
+  use = np.linspace(0, nt-1, num=4, dtype=int)
+  t2 = time.time()
+
+  'Took: {0}s'.format(t2-t1)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# Out[112]:
+: 'Took: 34.245070934295654s'
+:END:
+
+
+
+** Diffuse Fig
+
+#+BEGIN_SRC ipython :exports none :session  :ipyfile ./images/node_diffusion.png :results none
+  fig, ax = plt.subplots(2, 2, figsize=(20, 5))
+  counter = iter([0, 1, 2, 3])
+  for i in range(0, 2):
+      for j in range(0, 2):
+          id = next(counter)
+          draw_as_network(Cells[use[id]], ax[i, j], title='Time elapsed: {0}:{1}:{2}'.format(
+              use[id]//(60*60), (use[id]//60) % 60, use[id] % 60), draw_labels=True)
+
+  plt.tight_layout()
+#+END_SRC
+
+#+CAPTION: Node diffusion
+#+ATTR_ORG: :width 800
+#+ATTR_LATEX: :width 8cm
+[[./images/node_diffusion.png]]
+
+
+
+#+ATTR_LATEX: :environment longtable :width \textwidth :align l|l|l
+#+NAME: tab:estimate_intens
+#+CAPTION: Estimating the fluorescence from figure
+| $T$ | Cell -1 | Cell+1 |
+|-----+---------+--------|
+|   0 |      20 |     20 |
+|  15 |      25 |     40 |
+|  30 |      40 |     60 |
+|  45 |      45 |     76 |
+|  60 |      50 |     90 |
+
+** Comparing to Kitagawa
+
+*** Initial compare
+#+BEGIN_SRC ipython :exports none :session  :ipyfile ./images/line_plot_diffusion.png :results none
+  moss_values = [ 0.08, 0.15,0.3, 0.2, 0.1]
+  use = np.linspace(0, nt-1, num=4, dtype=int)
+  fig, ax = plt.subplots(2, 2, figsize=(10, 8))
+  counter = iter([0, 1, 2, 3])
+  for i in range(0, 2):
+      for j in range(0, 2):
+          id = next(counter)
+          nums = array_normalise(nodes_to_array(Cells[use[id]]).ravel())
+          nums = nums[(len(nums)//2)-2:(len(nums)//2)+3]
+          ax[i,j].plot(np.linspace(-2, 2, num=5), nums, label='Model')
+          sns.scatterplot(y=nums, x=np.linspace(-2, 2, num=5), ax=ax[i, j])
+          if i+j == 2:
+              ax[i,j].plot(np.linspace(-2, 2, num=5), moss_values, label='Kitagawa et al.')
+              sns.scatterplot(y=moss_values, x=np.linspace(-2, 2, num=5), ax=ax[i, j])
+          #ax[i, j].set_ylim(-0, 1.1)
+          if i > 0:
+              ax[i,j].set_xlabel('Cell position')
+          if j == 0:
+              ax[i,j].set_ylabel('Relative concentration')
+          ax[i,j].set_title(use[id])
+  plt.tight_layout()
+  # plt.show(block=False)
+#+END_SRC
+
+#+CAPTION: Node diffusion
+#+ATTR_ORG: :width 400
+#+ATTR_LATEX: :width 8cm
+[[./images/line_plot_diffusion.png]]
+
+
+*** Optimise input parameters
+
+#+BEGIN_SRC ipython :session :exports none :ipyfile ./images/opto.png :results none
+  from scipy.optimize import curve_fit
+  nodes = array_to_nodes(ic)
+  nt = 60*60
+  def make_test_data(x, pd_rate):
+      return nodes_to_array([diffuse(nodes, dx2, dy2, D, 1, pd_rate, beta) for i in range(1,nt)][-1]).ravel()
+
+  popt, pcov = curve_fit(make_test_data,  moss_values, np.linspace(0, 1, num=4))
+
+  nodes = array_to_nodes(ic)
+  plt.plot(nodes_to_array([diffuse(nodes, dx2, dy2, D, 1, 1, beta)][-1]).ravel(), label='Model')
+
+  plt.plot(moss_values, label='actual')
+  plt.legend()
+#+END_SRC
+
+
+
+[[./images/opto.png]]
+
+
+*** Compare with different values for PD restriction
+#+BEGIN_SRC ipython :exports none :session  :ipyfile ./images/line_plot_diffusion2.png :results none
+  moss_values = [ 0.08, 0.15,0.3, 0.2, 0.1]
+  use = np.linspace(0, nt-1, num=4, dtype=int)
+  fig, ax = plt.subplots(2, 2, figsize=(10, 8), sharex=True, sharey=True)
+  counter = iter([0, 1, 2, 3])
+  for i in range(0, 2):
+      for j in range(0, 2):
+          id = next(counter)
+          nums = array_normalise(nodes_to_array(Cells[use[id]]).ravel())
+          ax[i,j].plot(np.linspace(-2, 2, num=5), nums, label='Model')
+          sns.scatterplot(y=nums, x=np.linspace(-2, 2, num=5), ax=ax[i, j])
+          if i+j == 2:
+              ax[i,j].plot(np.linspace(-2, 2, num=5), moss_values, label='Kitagawa et al.')
+              sns.scatterplot(y=moss_values, x=np.linspace(-2, 2, num=5), ax=ax[i, j])
+          ax[i, j].set_ylim(-0, 1.1)
+          if i > 0:
+              ax[i,j].set_xlabel('Cell position')
+          if j == 0:
+              ax[i,j].set_ylabel('Relative concentration')
+  plt.tight_layout()
+  # plt.show(block=False)
+#+END_SRC
+
+#+CAPTION: Node diffusion
+#+ATTR_LATEX: :width 8cm
+[[./images/line_plot_diffusion2.png]]

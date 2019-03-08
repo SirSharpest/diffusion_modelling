@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Feb  7 09:05:05 2019
+
+@author: hughesn
+"""
+
+from SALib.sample import saltelli
+from SALib.analyze import sobol
+from SALib.test_functions import Ishigami
+import numpy as np
+
+problem = {
+  'num_vars': 3,
+  'names': ['x1', 'x2', 'x3'],
+  'bounds': [[-np.pi, np.pi]]*3
+}
+
+# Generate samples
+param_values = saltelli.sample(problem, 1000)
+
+# Run model (example)
+Y = Ishigami.evaluate(param_values)
+
+# Perform analysis
+Si = sobol.analyze(problem, Y, print_to_console=True)
+# Returns a dictionary with keys 'S1', 'S1_conf', 'ST', and 'ST_conf'
+# (first and total-order indices with bootstrap confidence intervals)
