@@ -63,13 +63,13 @@ def diffuse(u, dx2, D, pd_rate, b, dt):
                 # Check if right is available
                 Cs.append(u[y, x+1])
             if len(Cs) < 2:
-                un[y, x] = diffuse_1point(u[y, x], D, *Cs, dx2, b)
+                un[y, x] = diffuse_1point(u[y, x], D, *Cs, dx2, b, dt)
             elif len(Cs) < 3:
-                un[y, x] = diffuse_2point(u[y, x], D, *Cs, dx2, b)
+                un[y, x] = diffuse_2point(u[y, x], D, *Cs, dx2, b, dt)
             elif len(Cs) < 4:
-                un[y, x] = diffuse_3point(u[y, x], D, *Cs, dx2, b)
+                un[y, x] = diffuse_3point(u[y, x], D, *Cs, dx2, b, dt)
             elif len(Cs) == 4:
-                un[y, x] = diffuse_4point(u[y, x], D, *Cs, dx2, b)
+                un[y, x] = diffuse_4point(u[y, x], D, *Cs, dx2, b, dt)
             else:
                 # No connectivity
                 continue
@@ -80,23 +80,23 @@ def production(c, b):
     return np.zeros(c.shape)  # + (b * np.where)
 
 
-def diffuse_1point(c0, D, x1, dx2, b):
-    c = (c0 + D * ((x1 - c0)/dx2) + b)
+def diffuse_1point(c0, D, x1, dx2, b, dt):
+    c = c0 + dt*D * ((x1 - c0)/dx2) + b
     return c
 
 
-def diffuse_2point(c0, D, x1, x2, dx2, b):
-    c = c0 + D * ((x1 - 2*c0 + x2)/dx2) + b
+def diffuse_2point(c0, D, x1, x2, dx2, b, dt):
+    c = c0 + dt*D * ((x1 - 2*c0 + x2)/dx2) + b
     return c
 
 
-def diffuse_3point(c0, D, x1, x2, y1, dx2, b):
-    c = c0 + D * ((x1 - 3*c0 + x2 + y1)/dx2) + b
+def diffuse_3point(c0, D, x1, x2, y1, dx2, b, dt):
+    c = c0 + dt*D * ((x1 - 3*c0 + x2 + y1)/dx2) + b
     return c
 
 
-def diffuse_4point(c0, D, x1, x2, y1, y2, dx2, b):
-    c = c0 + D * ((x1 - 4*c0 + x2 + y1 + y2)/dx2) + b
+def diffuse_4point(c0, D, x1, x2, y1, y2, dx2, b, dt):
+    c = c0 + dt*D * ((x1 - 4*c0 + x2 + y1 + y2)/dx2) + b
     return c
 
 
