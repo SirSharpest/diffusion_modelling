@@ -56,9 +56,9 @@ def d_analysis(d_eff_on=False):
     if d_eff_on:
         problem = {
             'num_vars': 4,
-            'names': ['x', 'D', 'l', 'q'],
-            'bounds': [[0, 50],
-                       [gfp, sa],
+            'names': ['D', 'x', 'l', 'q'],
+            'bounds': [[gfp, sa],
+                       [0, 50],
                        [50, 100],
                        [0, 10]]
         }
@@ -87,8 +87,59 @@ def d_analysis(d_eff_on=False):
     return sobol.analyze(problem, Y, print_to_console=True)
 
 
-d_e = d_eff()
-d_a = d_analysis(d_eff_on=True)
+def prep_data_frames(d_result):
 
-# Make into DF
-pd.concat([i.T for i in d_a.to_df()]).T
+    tbl_a = pd.concat([i.T for i in d_result.to_df()[:-1]]).T
+
+    tbl_2nd = d_result.to_df()[-1].T
+    tbl_a = tbl_a.T
+
+    tbl_a = tbl_a[::2]
+    tbl_2nd = tbl_2nd[:1]
+
+    tbl_a_melted = pd.melt(tbl_a.reset_index(), id_vars='index',
+                           value_name='Si', var_name='variable')
+
+    tbl_2nd_melted = pd.melt(tbl_2nd.reset_index(), id_vars='index',
+                             value_name='Si', var_name='variable')
+
+    tbl_a_melted['variable'] = tbl_a_melted['variable'].map(''.join)
+    tbl_2nd_melted['variable'] = tbl_2nd_melted['variable'].map(','.join)
+    tbl_2nd_melted['variable'] = ['({0})'.format(a)
+                                  for a in tbl_2nd_melted['variable']]
+    tbl_2nd_melted['Si'] = abs(tbl_2nd_melted['Si'])
+
+    return (tbl_a_melted, tbl_2nd_melted)
+
+
+sa_d_eff = d_eff()
+sa_d_with_d_eff = d_analysis(d_eff_on=True)
+sa_d = d_analysis(d_eff_on=False)
+
+
+fig = plt.figure(0, figsize=(5, 5))
+fig.clf()
+fig, ax = plt.subplots(2, 2, num=0, sharey=True)
+[a.cla() for a in ax.ravel()]
+
+
+s1, s2 = prep_data_frames(sa_d_eff)
+sns.catplot(x='variable', y='Si', hue='index',
+            data=s1, kind='bar', ax=ax[0, 0])
+sns.catplot(x='variable', y='Si', hue='index',
+            data=s2, kind='bar', ax=ax[0, 1])
+
+ax[0, 0].set_title(r'Effect on diffusion by using $D$')
+ax[0, 1].set_title(r'Effect on diffusion by using $D$')
+
+s3, s4 = prep_data_frames(sa_d_with_d_eff)
+sns.catplot(x='variable', y='Si', hue='index',
+            data=s3, kind='bar', ax=ax[1, 0])
+sns.catplot(x='variable', y='Si', hue='index',
+            data=s4, kind='bar', ax=ax[1, 1])
+
+ax[1, 0].set_title(r'Effect on diffusion by using $D_{eff}$')
+ax[1, 1].set_title(r'Effect on diffusion by using $D_{eff}$')
+
+fig.tight_layout()
+fig.canvas.draw()
