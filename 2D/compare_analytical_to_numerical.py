@@ -9,6 +9,7 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 
 sns.set()
+plt.close('all')
 
 
 def make_numerical(nt):
@@ -34,52 +35,51 @@ def analytical(x, t, D):
 
 
 r = 3.5e-10
-cell_um = 300
-num_cells = 5
+cell_um = 100
+num_cells = 2
 dx = 10
-Xs, Ys = 100, 1
+Xs, Ys = 300, 1
 # Chem radius in meters
 r = 3.5e-10
 # Important model parameters
 q = 10
 D = stokes_einstein(r) * 1e+12
-dt = 0.01
+dt = 0.001
 # Being lazy and just updating D once here to be Deff
 D = D_eff(D, q, cell_um)
 
 
 fig = plt.figure(0, figsize=(10, 10))
 fig.clf()
-fig, ax = plt.subplots(1, sharex=True, num=0)
+fig, ax = plt.subplots(1, sharex=True, figsize=(5, 5), num=0)
 
-ts = [1, 10, 30, 60]
+ts = [0.5, 1, 10, 30]
 
 num_vals = {}
 analytical_vals = {}
 t1 = ti.time()
-colors = iter(['r', 'g', 'b', 'orange'])
-for i in range(0, 4):
+colors = iter(['r', 'g', 'b', 'orange', 'black'])
+for i in range(0, len(ts)):
     t = ts[i]
-    n = Xs*100
+    n = Xs*1000
     c = next(colors)
 
+    a_start = dx*cell_um
     analytical_solution = np.array(
-        [analytical(x, t, D)for x in np.linspace(-num_cells//2*cell_um, num_cells//2*cell_um, num=n)])
+        [analytical(x, t, D)for x in np.linspace(-a_start, a_start, num=n)])
 
     numerical_solution = make_numerical(t).ravel()
 
     num_vals[t] = numerical_solution
     analytical_vals[t] = analytical_solution
 
-    ax.plot(np.linspace(-num_cells//2*cell_um, num_cells//2*cell_um, num=n),
-            analytical_solution, label='Analytical: {0}s'.format(t), linewidth=3, c=c, alpha=0.5)
+    ax.plot(np.linspace(-a_start, a_start, num=n),
+            analytical_solution, label='Analytical: {0}s'.format(t), linewidth=4, c=c, alpha=0.5)
 
     ax.scatter(np.arange(-Xs//2*dx, +Xs//2*dx, step=dx),
-               numerical_solution, label='Numerical: {0}s'.format(t), linewidth=3, c=c, alpha=0.3)
+               numerical_solution, label='Numerical: {0}s'.format(t), linewidth=4, c=c, alpha=0.3)
     print(t)
 
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
-              ncol=4, fancybox=True, shadow=True)
 ax.set_xlabel(r'$\mu m$')
 ax.set_ylabel('C(x,t)')
 ax.set_title('')
@@ -88,14 +88,22 @@ ax.set_title('')
 #labels = np.linspace(-10, 10, 21, dtype=int)
 #ax.set_xticklabels(np.linspace(-10, 10, 22, dtype=int))
 
-ax.set_xlim(-300, 300)
+ax.set_xlim(-400, 400)
 
 
-fig.tight_layout()
 ax.set_yscale('log')
-ax.set_ylim(1e-4, 0.03)
-fig.canvas.draw()
+ax.set_ylim(1e-4, 0.05)
+
+for item in ([ax.title, ax.xaxis.label, ax.yaxis.label, ] +
+             ax.get_xticklabels() + ax.get_yticklabels() + ax.legend().get_texts()):
+    item.set_fontsize(20)
+
+
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
+          ncol=4, fancybox=True, shadow=True, prop={'size': 15})
+fig.tight_layout()
 
 t2 = ti.time()
 print(t2-t1)
-plt.show(block=False)
+fig.savefig(
+    '/Users/hughesn/PHD/Probation/figures/compare_analytical_to_numerical.png', dpi=500)
